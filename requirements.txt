@@ -1,0 +1,11 @@
+Flask
+flask-cors
+python-dotenv
+pillow
+PyMuPDF
+openai
+pypdf
+google-generativeai
+gunicorn
+azure-storage-blob
+psycopg2
