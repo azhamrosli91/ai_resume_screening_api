@@ -101,10 +101,27 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
     Analyze the resume against the job description and return your evaluation in raw JSON format only (without any markdown formatting or labels).
     Return the following fields in the JSON:
     name: Full name of the candidate
-    title: the job title
+    title: current job title 
     job_desription: the job description
     email: Email address
+    company: current company
+    past_company: list of all past companies as a valid JSON array of strings (e.g. ["Company A", "Company B"]) without the key (i.e. 0, 1, 2)  
+    description: list of all past description of the candidate work as a valid JSON array of strings (e.g. ["Company A", "Company B"]) without the key (i.e. 0, 1, 2)  
+    past_title: job title held before as a valid JSON array of strings (e.g. ["Company A", "Company B"]) without the key (i.e. 0, 1, 2)  
+    current_description: current company description
+    current_comp_year: current company start year must be in integer 
+    current_comp_month: current company start month must be in integer in range of 1 to 12 if not just do null
+    start_year: list of all start year of all past company and title
+    start_month: list of all start month of all past company and title must be in integer in range of 1 to 12 if not just do null
+    end_year: list of all end year of all past company and title
+    end_month: list of all end year of all past company and title must be in integer in range of 1 to 12 if not just do null
+    employment_type: permanent or contract
+    location: current company location
     phone_number: Phone number
+    skill: list down 5 skill that the candidate have
+    proficiency: proficiency of the 5 skill you listed
+    years_experience: years experience for the 5 skill you listed
+    last_used_year: last used year for 5 skill u listed
     percentage_match: An integer percentage (0–100) representing how well the resume matches the job description
     short_description: A 1–2 sentence summary of the candidate relevant to the job and you must include whether 
     <b>Ai Suggestion : <span class='text-success'>Can be hired </span> </b> if percentage_match above {accpetanceVal} or
@@ -126,7 +143,6 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON response: {response2.output_text}") from e
 
-    data["LOG_HISTORY_ID"] = current_uuid
     data["user_id"] = user_id
     data["file_url"] = url
     data["date"] = datetime.now(ZoneInfo("Asia/Kuala_Lumpur"))
@@ -135,48 +151,192 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
     data["pdf_name"] = original_filename
     data["match_acceptence"] = accpetanceVal 
 
-
-    values = (
-    data["LOG_HISTORY_ID"],
-    data["user_id"],
-    data["date"],
-    data["title"],
-    data["job_desription"],
-    data["file_url"],
-    data["name"],
-    data["email"],
-    data["phone_number"],
-    data["percentage_match"],
-    data["short_description"],
-    0,
-    data["total_token_openai"],
-    data["total_token_gemini"],
-    data["match_acceptence"]
-    )
-
-    insert_query = """
-    INSERT INTO LOG_HISTORY (
-        "LOG_HISTORY_ID",
-        "user_id",
-        "date_run",
-        "title",
-        "job_description",
-        "file_url",
-        "name",
-        "email",
-        "phone_no",
-        "match_percentage",
-        "short_desc",
-        "is_shortlisted",
-        "gpt_token",
-        "gemini_token",
-        "match_acceptance"
-    )
-     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    """
     with psycopg2.connect(pg_connection_string) as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute(insert_query, values)
+            values = (
+            current_uuid,
+            data["user_id"],
+            data["date"],
+            data["title"],
+            data["job_desription"],
+            data["file_url"],
+            data["name"],
+            data["email"],
+            data["phone_number"],
+            data["percentage_match"],
+            data["short_description"],
+            0,
+            data["total_token_openai"],
+            data["total_token_gemini"],
+            data["match_acceptence"]
+            )
+
+            insert_query = """
+            INSERT INTO LOG_HISTORY (
+                "LOG_HISTORY_ID",
+                "user_id",
+                "date_run",
+                "title",
+                "job_description",
+                "file_url",
+                "name",
+                "email",
+                "phone_no",
+                "match_percentage",
+                "short_desc",
+                "is_shortlisted",
+                "gpt_token",
+                "gemini_token",
+                "match_acceptance"
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(insert_query,values)
+            cand_id = str(uuid.uuid4())
+            email = user_id
+
+            # 1️⃣ Check if candidate already exists
+            cursor.execute("SELECT candidate_id FROM candidates WHERE owner_email = %s AND candidate_email =%s", (email, data.get("email")))
+            existing = cursor.fetchone()
+
+            if existing:
+                can_id = existing["candidate_id"]
+                # If exists, UPDATE current experience
+                #CANDIDATE TABLEEEEEEEEEE
+                cursor.execute("""
+                    UPDATE candidates
+                    SET current_company = %s,
+                        current_title = %s,
+                        updated_at = now()
+                    WHERE candidate_id = %s
+                """, (
+                    data.get("company"),
+                    data.get("title"),
+                    can_id
+                ))
+
+                #CANDIDATE EXPERIENCE TABLEEEEEEEEEE
+                cursor.execute("""
+                    UPDATE candidate_experience
+                    SET company = %s,
+                        description = %s,
+                        title = %s,
+                        start_year = %s,
+                        start_month = %s,
+                        employment_type = %s,
+                        is_current = %s,
+                        updated_at = now()
+                    WHERE candidate_id = %s
+                    AND company = %s
+                """, (
+                    data.get("company"),
+                    data.get("current_description"),
+                    data.get("title"),
+                    data.get("current_comp_year"),
+                    data.get("current_comp_month"),
+                    data.get("employment_type"),
+                    True,
+                    can_id,
+                    data.get("company")
+                ))
+
+
+            else:
+                # If not exists, INSERT new current experience
+                skills = data.get("skill", [])
+                proficiency = data.get("proficiency", [])
+                years_exp = data.get("years_experience", [])
+                last_used = data.get("last_used_year", [])
+
+                insert_current = """
+                    INSERT INTO candidate_skills (
+                        candidate_id, skill_name, proficiency, years_experience,
+                        last_used_year, created_at
+                    ) VALUES (%s, %s, %s, %s, %s, now())
+                """
+
+                for i in range(len(skills)):
+                    cursor.execute(insert_current, (
+                        cand_id,
+                        skills[i],
+                        proficiency[i],
+                        years_exp[i],
+                        last_used[i]
+                    ))
+
+                insert_current = """
+                    INSERT INTO candidates (
+                        candidate_id, owner_email, full_name, current_company, notes, current_title,
+                        location, candidate_email, phone, resume_url, created_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                """
+                
+                cursor.execute(insert_current, (
+                    cand_id,
+                    email,
+                    data.get("name"),                    
+                    data.get("company"),
+                    data.get("current_description"),
+                    data.get("title"),
+                    data.get("location"),
+                    data.get("email"),
+                    data.get("phone_number"),
+                    url
+                ))
+
+                insert_current = """
+                    INSERT INTO candidate_experience (
+                        candidate_id, company, description, title,
+                        start_year, start_month, employment_type, is_current
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                
+                cursor.execute(insert_current, (
+                    cand_id,
+                    data.get("company"),
+                    data.get("current_description"),
+                    data.get("title"),
+                    data.get("current_comp_year"),
+                    data.get("current_comp_month"),
+                    data.get("employment_type"),
+                    True
+                ))
+
+            # 2️⃣ Insert past experiences (only if not duplicate company for same candidate)
+            past_companies   = data.get("past_company", [])
+            past_titles      = data.get("past_title", [])
+            past_descriptions = data.get("description", [])
+            start_years      = data.get("start_year", [])
+            start_months     = data.get("start_month", [])
+            end_years        = data.get("end_year", [])
+            end_months       = data.get("end_month", [])
+
+            for i, company in enumerate(past_companies):
+                # Check if this past company already exists for this candidate
+                cursor.execute("""
+                    SELECT 1 FROM candidate_experience 
+                    WHERE candidate_id = %s AND company = %s AND is_current = false
+                """, (cand_id, company))
+                
+                if cursor.fetchone():
+                    continue  # skip duplicate past company
+                
+                cursor.execute("""
+                    INSERT INTO candidate_experience (
+                        candidate_id, company, title, description,
+                        start_year, start_month, end_year, end_month, is_current
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, false)
+                """, (
+                    cand_id,
+                    company,
+                    past_titles[i] if i < len(past_titles) else None,
+                    past_descriptions[i] if i < len(past_descriptions) else None,
+                    start_years[i] if i < len(start_years) else None,
+                    start_months[i] if i < len(start_months) else None,
+                    end_years[i] if i < len(end_years) else None,
+                    end_months[i] if i < len(end_months) else None
+                ))
+
             conn.commit()
 
 
@@ -224,5 +384,5 @@ def upload_resume():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     
-# if __name__ == '__main__':
-#     app.run(host="0.0.0.0", port=5000, debug=True)
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=5000, debug=True)
