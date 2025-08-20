@@ -94,14 +94,17 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
 
     resume = all_text
 
-    prompt = f"""
+    no_description = job_desc == "!##NO DESCRIPTION##!"
+
+    if no_description:
+        prompt = f"""
     You are a resume evaluator. You are given the following inputs:
     Job Description: {job_desc}
     Resume: {resume}
-    Analyze the resume against the job description and return your evaluation in raw JSON format only (without any markdown formatting or labels).
+    Analyze the resume and return in raw JSON format only (without any markdown formatting or labels).
     Return the following fields in the JSON:
     name: Full name of the candidate
-    title: current job title 
+    title: current job title
     job_desription: the job description
     email: Email address
     company: current company
@@ -109,7 +112,39 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
     description: list of all past description of the candidate work as a valid JSON array of strings (e.g. ["Company A", "Company B"]) without the key (i.e. 0, 1, 2)  
     past_title: job title held before as a valid JSON array of strings (e.g. ["Company A", "Company B"]) without the key (i.e. 0, 1, 2)  
     current_description: current company description
-    current_comp_year: current company start year must be in integer 
+    current_comp_year: current company start year must be in integer
+    current_comp_month: current company start month must be in integer in range of 1 to 12 if not just do null
+    start_year: list of all start year of all past company and title
+    start_month: list of all start month of all past company and title must be in integer in range of 1 to 12 if not just do null
+    end_year: list of all end year of all past company and title
+    end_month: list of all end year of all past company and title must be in integer in range of 1 to 12 if not just do null
+    employment_type: permanent or contract
+    location: current company location
+    phone_number: Phone number
+    skill: list down 5 skill that the candidate have
+    proficiency: proficiency of the 5 skill you listed
+    years_experience: years experience for the 5 skill you listed
+    last_used_year: last used year for 5 skill u listed
+    percentage_match: put 0 only
+    short_description: A 1–2 sentence summary of the about candidate
+    """
+    else:
+        prompt = f"""
+    You are a resume evaluator. You are given the following inputs:
+    Job Description: {job_desc}
+    Resume: {resume}
+    Analyze the resume against the job description and return your evaluation in raw JSON format only (without any markdown formatting or labels).
+    Return the following fields in the JSON:
+    name: Full name of the candidate
+    title: current job title
+    job_desription: the job description
+    email: Email address
+    company: current company
+    past_company: list of all past companies as a valid JSON array of strings (e.g. ["Company A", "Company B"]) without the key (i.e. 0, 1, 2)
+    description: list of all past description of the candidate work as a valid JSON array of strings (e.g. ["Company A", "Company B"]) without the key (i.e. 0, 1, 2)
+    past_title: job title held before as a valid JSON array of strings (e.g. ["Company A", "Company B"]) without the key (i.e. 0, 1, 2)
+    current_description: current company description
+    current_comp_year: current company start year must be in integer
     current_comp_month: current company start month must be in integer in range of 1 to 12 if not just do null
     start_year: list of all start year of all past company and title
     start_month: list of all start month of all past company and title must be in integer in range of 1 to 12 if not just do null
@@ -123,7 +158,7 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
     years_experience: years experience for the 5 skill you listed
     last_used_year: last used year for 5 skill u listed
     percentage_match: An integer percentage (0–100) representing how well the resume matches the job description
-    short_description: A 1–2 sentence summary of the candidate relevant to the job and you must include whether 
+    short_description: A 1–2 sentence summary of the candidate relevant to the job and you must include whether
     <b>Ai Suggestion : <span class='text-success'>Can be hired </span> </b> if percentage_match above {accpetanceVal} or
     <b>Ai Suggestion : <span class='text-danger'>Not recommended to be hired</span></b> below
     do <br> before the ai suggestion html script
@@ -149,51 +184,56 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
     data["total_token_gemini"] = gemini_token
     data["total_token_openai"] = response2.usage.total_tokens
     data["pdf_name"] = original_filename
-    data["match_acceptence"] = accpetanceVal 
+    data["match_acceptence"] = accpetanceVal
+
+    if no_description:
+        data["percentage_match"] = 0
 
     with psycopg2.connect(pg_connection_string) as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-            values = (
-            current_uuid,
-            data["user_id"],
-            data["date"],
-            data["title"],
-            data["job_desription"],
-            data["file_url"],
-            data["name"],
-            data["email"],
-            data["phone_number"],
-            data["percentage_match"],
-            data["short_description"],
-            0,
-            data["total_token_openai"],
-            data["total_token_gemini"],
-            data["match_acceptence"]
-            )
-
-            insert_query = """
-            INSERT INTO LOG_HISTORY (
-                "LOG_HISTORY_ID",
-                "user_id",
-                "date_run",
-                "title",
-                "job_description",
-                "file_url",
-                "name",
-                "email",
-                "phone_no",
-                "match_percentage",
-                "short_desc",
-                "is_shortlisted",
-                "gpt_token",
-                "gemini_token",
-                "match_acceptance"
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            cursor.execute(insert_query,values)
             cand_id = str(uuid.uuid4())
             email = user_id
+
+            if not no_description:
+                values = (
+                current_uuid,
+                data["user_id"],
+                data["date"],
+                data["title"],
+                data["job_desription"],
+                data["file_url"],
+                data["name"],
+                data["email"],
+                data["phone_number"],
+                data["percentage_match"],
+                data["short_description"],
+                0,
+                data["total_token_openai"],
+                data["total_token_gemini"],
+                data["match_acceptence"]
+                )
+
+                insert_query = """
+                INSERT INTO LOG_HISTORY (
+                    "LOG_HISTORY_ID",
+                    "user_id",
+                    "date_run",
+                    "title",
+                    "job_description",
+                    "file_url",
+                    "name",
+                    "email",
+                    "phone_no",
+                    "match_percentage",
+                    "short_desc",
+                    "is_shortlisted",
+                    "gpt_token",
+                    "gemini_token",
+                    "match_acceptance"
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                cursor.execute(insert_query,values)
 
             # 1️⃣ Check if candidate already exists
             cursor.execute("SELECT candidate_id FROM candidates WHERE owner_email = %s AND candidate_email =%s", (email, data.get("email")))
