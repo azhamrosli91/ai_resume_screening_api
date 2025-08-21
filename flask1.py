@@ -113,17 +113,17 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
     past_title: job title held before as a valid JSON array of strings (e.g. ["Company A", "Company B"]) without the key (i.e. 0, 1, 2)  
     current_description: current company description
     current_comp_year: current company start year must be in integer
-    current_comp_month: current company start month must be in integer in range of 1 to 12 if not just do null
+    current_comp_month: current company start month must be in integer in range of 1 to 12
     start_year: list of all start year of all past company and title
-    start_month: list of all start month of all past company and title must be in integer in range of 1 to 12 if not just do null
+    start_month: list of all start month of all past company and title must be in integer in range of 1 to 12
     end_year: list of all end year of all past company and title
-    end_month: list of all end year of all past company and title must be in integer in range of 1 to 12 if not just do null
+    end_month: list of all end year of all past company and title must be in integer in range of 1 to 12 
     employment_type: permanent or contract
     location: current company location
     phone_number: Phone number
     skill: list down 5 skill that the candidate have
     proficiency: proficiency of the 5 skill you listed
-    years_experience: years experience for the 5 skill you listed
+    years_experience: years experience for the 5 skill you listed must return in list for each skill
     last_used_year: last used year for 5 skill u listed
     percentage_match: put 0 only
     short_description: A 1–2 sentence summary of the about candidate
@@ -145,17 +145,17 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
     past_title: job title held before as a valid JSON array of strings (e.g. ["Company A", "Company B"]) without the key (i.e. 0, 1, 2)
     current_description: current company description
     current_comp_year: current company start year must be in integer
-    current_comp_month: current company start month must be in integer in range of 1 to 12 if not just do null
+    current_comp_month: current company start month must be in integer in range of 1 to 12
     start_year: list of all start year of all past company and title
-    start_month: list of all start month of all past company and title must be in integer in range of 1 to 12 if not just do null
-    end_year: list of all end year of all past company and title
-    end_month: list of all end year of all past company and title must be in integer in range of 1 to 12 if not just do null
+    start_month: list of all start month of all past company and title must be in integer in range of 1 to 12
+    end_year: list of all end year of all past company and title must be null if for current company
+    end_month: list of all end year of all past company and title must be in integer in range of 1 to 12 must be null if for current company
     employment_type: permanent or contract
     location: current company location
     phone_number: Phone number
     skill: list down 5 skill that the candidate have
     proficiency: proficiency of the 5 skill you listed
-    years_experience: years experience for the 5 skill you listed
+    years_experience: years experience for the 5 skill you listed must return in list for each skill
     last_used_year: last used year for 5 skill u listed
     percentage_match: An integer percentage (0–100) representing how well the resume matches the job description
     short_description: A 1–2 sentence summary of the candidate relevant to the job and you must include whether
@@ -361,11 +361,15 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
                 if cursor.fetchone():
                     continue  # skip duplicate past company
                 
+                curr = False
+                if (end_years[i] is None) or (end_months[i] is None):
+                    curr = True
+
                 cursor.execute("""
                     INSERT INTO candidate_experience (
                         candidate_id, company, title, description,
                         start_year, start_month, end_year, end_month, is_current
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, false)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     cand_id,
                     company,
@@ -374,7 +378,8 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
                     start_years[i] if i < len(start_years) else None,
                     start_months[i] if i < len(start_months) else None,
                     end_years[i] if i < len(end_years) else None,
-                    end_months[i] if i < len(end_months) else None
+                    end_months[i] if i < len(end_months) else None,
+                    curr
                 ))
 
             conn.commit()
@@ -424,5 +429,5 @@ def upload_resume():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True)
+# if __name__ == '__main__':
+#     app.run(host="0.0.0.0", port=5000, debug=True)
