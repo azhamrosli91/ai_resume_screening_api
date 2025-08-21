@@ -10,28 +10,30 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    # Log in to GitHub Container Registry
-    - name: Log in to GitHub container registry
-      uses: docker/login-action@v2
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      # Log in to Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    # Build and tag the Docker image; tag with both timestamp and 'latest'
-    - name: Build the Docker image
-      run: |
-        IMAGE_TAG=$(date +%s)
-        docker build . \
-          --file Dockerfile \
-          --tag ghcr.io/${{ github.repository }}/my-image-name:$IMAGE_TAG \
-          --tag ghcr.io/${{ github.repository }}/my-image-name:latest
+      # Build & tag (timestamp + latest)
+      - name: Build image
+        run: |
+          IMAGE_NAME=docker.io/nidzam26/resume-evaluator
+          TIMESTAMP=$(date +%s)
 
-    # Push the tags to registry
-    - name: Push the Docker image
-      run: |
-        IMAGE_TAG=$(date +%s)
-        docker push ghcr.io/${{ github.repository }}/my-image-name:$IMAGE_TAG
-        docker push ghcr.io/${{ github.repository }}/my-image-name:latest
+          docker build . -f Dockerfile \
+            -t $IMAGE_NAME:$TIMESTAMP \
+            -t $IMAGE_NAME:latest
+
+          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
+          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
+
+      # Push both tags
+      - name: Push image
+        run: |
+          docker push $IMAGE_NAME:$TIMESTAMP
+          docker push $IMAGE_NAME:latest
