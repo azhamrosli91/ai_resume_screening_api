@@ -9,3 +9,4 @@ google-generativeai
 gunicorn
 azure-storage-blob
 psycopg2
+faker
