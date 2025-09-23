@@ -368,8 +368,8 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
                 insert_candidate_q = """
                     INSERT INTO candidates (
                         candidate_id, owner_email, full_name, current_company, notes, current_title,
-                        location, candidate_email, phone, resume_url, created_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                        location, candidate_email, phone, resume_url,user_id, created_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
                 """
                 cursor.execute(insert_candidate_q, (
                     candidate_id,
@@ -381,7 +381,8 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
                     data.get("location"),
                     data.get("email"),
                     data.get("phone_number"),
-                    url
+                    url,
+                    user_id
                 ))
 
                 # Insert current experience row if start date available
