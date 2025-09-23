@@ -105,7 +105,7 @@ def dummy_data():
 
 
 # Evaluation
-def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, acceptance = 70, is_dummy = False):
+def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, acceptance = 70, is_dummy = False, job_title = ''):
 
     if is_dummy:
         return dummy_data()
@@ -226,7 +226,10 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
     data["pdf_name"] = original_filename
     data["match_acceptence" ] = accpetanceVal
     data["LOG_HISTORY_ID"] = current_uuid
-
+    
+    if job_title:  # this is True if job_title is not None or not empty
+    data["title"] = job_title
+    
     if no_description:
         data["percentage_match"] = 0
 
