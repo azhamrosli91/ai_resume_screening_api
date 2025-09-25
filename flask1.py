@@ -105,7 +105,16 @@ def dummy_data():
 
 
 # Evaluation
-def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, acceptance = 70, is_dummy = False, job_title = '', id_MM_user = ''):
+def evaluate_resume(
+        pdf_path,
+        original_filename,
+        job_desc,
+        user_id,
+        url,
+        acceptance=70,
+        is_dummy=False,
+        job_title='',
+        id_MM_user=''):
 
     if is_dummy:
         return dummy_data()
@@ -227,8 +236,9 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
     data["match_acceptence" ] = accpetanceVal
     data["LOG_HISTORY_ID"] = current_uuid
     
-    if job_title:  # this is True if job_title is not None or not empty
-        data["title"] = job_title
+    job_title_clean = job_title.strip() if isinstance(job_title, str) else ''
+    if job_title_clean:
+        data["title"] = job_title_clean
     
     if no_description:
         data["percentage_match"] = 0
@@ -239,11 +249,12 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
 
             # --- LOG_HISTORY insert (unchanged) ---
             if not no_description:
+                log_title = job_title_clean if job_title_clean else data.get("title")
                 values = (
                     data["LOG_HISTORY_ID"],
                     data["user_id"],
                     data["date"],
-                    data["title"],
+                    log_title,
                     data["job_desription"],
                     data["file_url"],
                     data["name"],
@@ -460,24 +471,24 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
                 ))
 
             # Track the candidate_track, user_id, and resume_id is exsit or not
-            cursor.execute("""
-                SELECT 1 FROM candidate_track
-                WHERE user_id = %s AND resume_id = %s
-                LIMIT 1
-            """, (id_MM_user, candidate_id))
-
-            track_exists = cursor.fetchone()
-
-            print(id_MM_user)
-
-            if not track_exists:
+            id_MM_user_clean = id_MM_user.strip() if isinstance(id_MM_user, str) else ''
+            if id_MM_user_clean:
                 cursor.execute("""
-                    INSERT INTO candidate_track (user_id, resume_id)
-                    VALUES (%s, %s)
-                """,(
-                    id_MM_user,
-                    candidate_id
-                ))
+                    SELECT 1 FROM candidate_track
+                    WHERE user_id = %s AND resume_id = %s
+                    LIMIT 1
+                """, (id_MM_user_clean, candidate_id))
+
+                track_exists = cursor.fetchone()
+
+                if not track_exists:
+                    cursor.execute("""
+                        INSERT INTO candidate_track (user_id, resume_id)
+                        VALUES (%s, %s)
+                    """, (
+                        id_MM_user_clean,
+                        candidate_id
+                    ))
 
             conn.commit()
 
@@ -490,6 +501,8 @@ def upload_resume():
     user_id = request.form.get('user_id')
     acceptance = request.form.get('acceptance')
     is_dummy = request.form.get('is_dummy')
+    job_title = request.form.get('job_title', '')
+    id_mm_user = request.form.get('id_mm_user', '')
 
     if not job_desc:
         return jsonify({'error': 'No job description provided'}), 400
@@ -503,7 +516,9 @@ def upload_resume():
             user_id=user_id,
             url=None,
             acceptance=acceptance,
-            is_dummy=True
+            is_dummy=True,
+            job_title=job_title,
+            id_MM_user=id_mm_user
         )
         return result  # already jsonify() inside dummy_data()
 
@@ -540,7 +555,9 @@ def upload_resume():
                 user_id=user_id,
                 url=url,
                 acceptance=acceptance,
-                is_dummy=False
+                is_dummy=False,
+                job_title=job_title,
+                id_MM_user=id_mm_user
             )
 
         return jsonify(result)
