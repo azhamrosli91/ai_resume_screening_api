@@ -105,7 +105,7 @@ def dummy_data():
 
 
 # Evaluation
-def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, acceptance = 70, is_dummy = False, job_title = ''):
+def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, acceptance = 70, is_dummy = False, job_title = '', id_MM_user = ''):
 
     if is_dummy:
         return dummy_data()
@@ -228,7 +228,7 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
     data["LOG_HISTORY_ID"] = current_uuid
     
     if job_title:  # this is True if job_title is not None or not empty
-    data["title"] = job_title
+        data["title"] = job_title
     
     if no_description:
         data["percentage_match"] = 0
@@ -457,6 +457,26 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, accepta
                     end_year,
                     end_month,
                     is_current
+                ))
+
+            # Track the candidate_track, user_id, and resume_id is exsit or not
+            cursor.execute("""
+                SELECT 1 FROM candidate_track
+                WHERE user_id = %s AND resume_id = %s
+                LIMIT 1
+            """, (id_MM_user, candidate_id))
+
+            track_exists = cursor.fetchone()
+
+            print(id_MM_user)
+
+            if not track_exists:
+                cursor.execute("""
+                    INSERT INTO candidate_track (user_id, resume_id)
+                    VALUES (%s, %s)
+                """,(
+                    id_MM_user,
+                    candidate_id
                 ))
 
             conn.commit()
