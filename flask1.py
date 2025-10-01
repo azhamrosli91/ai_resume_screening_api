@@ -105,7 +105,7 @@ def dummy_data():
 
 
 # Evaluation
-def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, job_name, id_MM_user, acceptance = 70, is_dummy = False):
+def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, job_name, id_MM_user, batch_id, acceptance = 70, is_dummy = False):
 
     if is_dummy:
         return dummy_data()
@@ -227,16 +227,23 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, job_nam
     data["match_acceptence" ] = accpetanceVal
     data["LOG_HISTORY_ID"] = current_uuid
     
-    data["title"] = job_name
+    if job_name != "!##NOJOBNAME##!": 
+     data["title"] = job_name
 
-    print('job title: ',job_name)
-    
     if no_description:
         data["percentage_match"] = 0
 
     with psycopg2.connect(pg_connection_string) as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             cand_id = str(uuid.uuid4())
+
+            # --- Insert into log_history_batch first
+            cursor.execute("""
+                INSERT INTO log_history_batch (batch_id, created_by)
+                VALUES (%s, %s)
+                ON CONFLICT (batch_id) DO NOTHING;
+            """, (batch_id, user_id))
+
 
             # --- LOG_HISTORY insert (unchanged) ---
             if not no_description:
@@ -255,14 +262,15 @@ def evaluate_resume(pdf_path, original_filename, job_desc, user_id, url, job_nam
                     0,
                     data["total_token_openai"],
                     data["total_token_gemini"],
-                    data["match_acceptence"]
+                    data["match_acceptence"],
+                    batch_id
                 )
                 insert_query = """
                 INSERT INTO LOG_HISTORY (
                     "LOG_HISTORY_ID", user_id, date_run, title, job_description,
                     file_url, name, email, phone_no, match_percentage,
-                    short_desc, is_shortlisted, gpt_token, gemini_token, match_acceptance
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    short_desc, is_shortlisted, gpt_token, gemini_token, match_acceptance, batch_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 cursor.execute(insert_query, values)
 
@@ -491,6 +499,7 @@ def upload_resume():
     user_id = request.form.get('user_id')
     job_name = request.form.get('job_name')
     id_MM_user = request.form.get('id_MM_user')
+    batch_id = request.form.get('batch_id') or request.form.get('batchId')
     acceptance = request.form.get('acceptance')
     is_dummy = request.form.get('is_dummy')
 
@@ -544,6 +553,7 @@ def upload_resume():
                 url,
                 job_name,
                 id_MM_user,
+                batch_id,
                 acceptance = 70,
                 is_dummy=False
             )
